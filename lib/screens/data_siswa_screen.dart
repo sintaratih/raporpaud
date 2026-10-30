@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../widgets/bottom_navbar.dart';
 
+import 'dashboard_screen.dart';
+import 'siswa/form_siswa_screen.dart';
+import 'siswa/detail_siswa_screen.dart';
+
 class DataSiswaScreen extends StatefulWidget {
   const DataSiswaScreen({super.key});
 
@@ -146,82 +150,116 @@ class _DataSiswaScreenState extends State<DataSiswaScreen> {
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(13),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                backgroundColor:
-                                    const Color(0xFFDCEAFF),
-                                child: Text(
-                                  student['inisial']!,
-                                  style: const TextStyle(
-                                    color: Color(0xFF1765D9),
-                                    fontWeight: FontWeight.bold,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () async {
+                              final hasil = await Navigator.push<Map<String, String>>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => DetailSiswaScreen(
+                                    siswa: student,
                                   ),
                                 ),
-                              ),
+                              );
 
-                              const SizedBox(width: 12),
+                               if (hasil != null) {
+                                setState(() {
+                                  if (hasil['_aksi'] == 'hapus') {
+                                    students.remove(student);
+                                  } else {
+                                  final studentIndex = students.indexOf(student);
 
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      student['nama']!,
+                                  if (studentIndex != -1) {
+                                    students[studentIndex] = {
+                                      ...hasil,
+                                      'inisial': hasil['nama']!
+                                          .trim()
+                                          .split(' ')
+                                          .map((kata) => kata[0])
+                                          .take(2)
+                                          .join()
+                                          .toUpperCase(),
+                                      };
+                                    }
+                                  }
+                                });
+                              }
+                            },
+
+                            child: Padding(
+                              padding: const EdgeInsets.all(13),
+                              child: Row(
+                                children: [
+                                  CircleAvatar(
+                                    backgroundColor: const Color(0xFFDCEAFF),
+                                    child: Text(
+                                      student['inisial']!,
                                       style: const TextStyle(
+                                        color: Color(0xFF1765D9),
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 12,
                                       ),
                                     ),
-                                    Text(
-                                      'NIS: ${student['nis']}',
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    Text(
-                                      'NISN: ${student['nisn']}',
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: student['kelompok'] ==
-                                          'Kelompok A'
-                                      ? const Color(0xFFE0F5EB)
-                                      : const Color(0xFFFFEEDC),
-                                  borderRadius:
-                                      BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  student['kelompok']!,
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    color: student['kelompok'] ==
-                                            'Kelompok A'
-                                        ? Colors.green
-                                        : Colors.orange,
                                   ),
-                                ),
+
+                                  const SizedBox(width: 12),
+
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          student['nama']!,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        Text(
+                                          'NIS: ${student['nis']}',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                        Text(
+                                          'NISN: ${student['nisn']}',
+                                          style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: student['kelompok'] == 'Kelompok A'
+                                          ? const Color(0xFFE0F5EB)
+                                          : const Color(0xFFFFEEDC),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      student['kelompok']!,
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        color: student['kelompok'] == 'Kelompok A'
+                                            ? Colors.green
+                                            : Colors.orange,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
                         );
                       },
@@ -230,25 +268,47 @@ class _DataSiswaScreenState extends State<DataSiswaScreen> {
           ],
         ),
       ),
-
+      
       floatingActionButton: FloatingActionButton(
         backgroundColor: const Color(0xFF1765D9),
         foregroundColor: Colors.white,
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Fitur tambah siswa akan dibuat berikutnya'),
+        onPressed: () async {
+          final hasil = await Navigator.push<Map<String, String>>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const FormSiswaScreen(),
             ),
           );
+
+          if (hasil != null) {
+            setState(() {
+              students.add({
+                ...hasil,
+                'inisial': hasil['nama']!
+                    .trim()
+                    .split(' ')
+                    .map((kata) => kata[0])
+                    .take(2)
+                    .join()
+                    .toUpperCase(),
+              });
+            });
+          }
         },
         child: const Icon(Icons.add),
       ),
+
 
       bottomNavigationBar: BottomNavBar(
         currentIndex: 1,
         onTap: (index) {
           if (index == 0) {
-            Navigator.pop(context);
+            Navigator.pushReplacement(
+            context,
+              MaterialPageRoute(
+                builder: (context) => const DashboardScreen()
+              )
+            );
           }
         },
       ),

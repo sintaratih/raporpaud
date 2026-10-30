@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../widgets/bottom_navbar.dart';
+
 import 'data_siswa_screen.dart';
+import 'absensi/absensi_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -160,11 +162,21 @@ class DashboardScreen extends StatelessWidget {
                     icon: Icons.camera_alt_outlined,
                     color: Color(0xFF16A879),
                   ),
-                  const MenuCard(
+
+                  MenuCard(
                     title: 'Absensi',
                     icon: Icons.calendar_month,
-                    color: Color(0xFF7650D9),
+                    color: const Color(0xFF7650D9),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AbsensiScreen(),
+                        ),
+                      );
+                    },
                   ),
+
                   const MenuCard(
                     title: 'Buat Rapor',
                     icon: Icons.description_outlined,
@@ -195,6 +207,13 @@ class DashboardScreen extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) => const DataSiswaScreen(),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AbsensiScreen(),
               ),
             );
           }
