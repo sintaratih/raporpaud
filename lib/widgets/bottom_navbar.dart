@@ -38,8 +38,8 @@ class BottomNavBar extends StatelessWidget {
           label: 'Rapor',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.grid_view),
-          label: 'Lainnya',
+          icon: Icon(Icons.settings_outlined),
+          label: 'Pengaturan',
         ),
       ],
     );

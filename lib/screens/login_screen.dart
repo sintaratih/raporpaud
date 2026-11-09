@@ -1,8 +1,86 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'dashboard_screen.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final emailController = TextEditingController();
+  final passwordController = TextEditingController();
+
+  bool isLoading = false;
+  bool isPasswordVisible = false;
+
+  Future<void> login() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Email dan password harus diisi'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const DashboardScreen(),
+        ),
+      );
+    } on AuthException catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Login gagal: ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Terjadi kesalahan: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,11 +138,14 @@ class LoginScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-              const Text('Username atau Email'),
+              const Text('Email'),
               const SizedBox(height: 8),
+
               TextField(
+                controller: emailController,
+                keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
-                  hintText: 'Masukkan username atau email',
+                  hintText: 'Masukkan email',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -75,11 +156,24 @@ class LoginScreen extends StatelessWidget {
 
               const Text('Password'),
               const SizedBox(height: 8),
+
               TextField(
-                obscureText: true,
+                controller: passwordController,
+                obscureText: !isPasswordVisible,
                 decoration: InputDecoration(
                   hintText: 'Masukkan password',
-                  suffixIcon: const Icon(Icons.visibility_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      isPasswordVisible
+                          ? Icons.visibility
+                          : Icons.visibility_outlined,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        isPasswordVisible = !isPasswordVisible;
+                      });
+                    },
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -99,16 +193,12 @@ class LoginScreen extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            const DashboardScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('Masuk'),
+                  onPressed: isLoading ? null : login,
+                  child: isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : const Text('Masuk'),
                 ),
               ),
 

@@ -1,11 +1,76 @@
-import 'package:flutter/material.dart';
-import '../widgets/bottom_navbar.dart';
 
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../widgets/bottom_navbar.dart';
 import 'data_siswa_screen.dart';
 import 'absensi/absensi_screen.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  int jumlahSiswa = 0;
+  bool sedangMemuat = true;
+  bool gagalMemuat = false;
+
+  @override
+  void initState() {
+    super.initState();
+    ambilJumlahSiswa();
+  }
+
+  // Mengambil jumlah siswa dari Supabase
+  Future<void> ambilJumlahSiswa() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('siswa')
+          .select('id');
+
+      if (!mounted) return;
+
+      setState(() {
+        jumlahSiswa = data.length;
+        sedangMemuat = false;
+        gagalMemuat = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        sedangMemuat = false;
+        gagalMemuat = true;
+      });
+
+      debugPrint('Gagal mengambil jumlah siswa: $e');
+    }
+  }
+
+  // Membuka halaman siswa dan memperbarui statistik saat kembali
+  Future<void> bukaDataSiswa() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const DataSiswaScreen(),
+      ),
+    );
+
+    ambilJumlahSiswa();
+  }
+
+  // Membuka halaman absensi
+  void bukaAbsensi() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AbsensiScreen(),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,8 +124,11 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 child: const Row(
                   children: [
-                    Icon(Icons.calendar_month,
-                        color: Colors.white, size: 30),
+                    Icon(
+                      Icons.calendar_month,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                     SizedBox(width: 15),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,26 +163,30 @@ class DashboardScreen extends StatelessWidget {
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
                 childAspectRatio: 2.2,
-                children: const [
+                children: [
                   StatCard(
                     title: 'Siswa Aktif',
-                    value: '25',
+                    value: sedangMemuat
+                        ? '...'
+                        : gagalMemuat
+                            ? '-'
+                            : jumlahSiswa.toString(),
                     icon: Icons.people_outline,
-                    color: Color(0xFF1765D9),
+                    color: const Color(0xFF1765D9),
                   ),
-                  StatCard(
+                  const StatCard(
                     title: 'Rapor Selesai',
                     value: '15',
                     icon: Icons.check_circle_outline,
                     color: Color(0xFF16A879),
                   ),
-                  StatCard(
+                  const StatCard(
                     title: 'Belum Selesai',
                     value: '10',
                     icon: Icons.access_time,
                     color: Color(0xFFFF9D35),
                   ),
-                  StatCard(
+                  const StatCard(
                     title: 'Perlu Revisi',
                     value: '2',
                     icon: Icons.warning_amber,
@@ -135,6 +207,7 @@ class DashboardScreen extends StatelessWidget {
 
               const SizedBox(height: 14),
 
+              // MENU UTAMA
               GridView.count(
                 crossAxisCount: 3,
                 shrinkWrap: true,
@@ -147,36 +220,19 @@ class DashboardScreen extends StatelessWidget {
                     title: 'Data Siswa',
                     icon: Icons.people_outline,
                     color: const Color(0xFF1765D9),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const DataSiswaScreen(),
-                        ),
-                      );
-                    },
+                    onTap: bukaDataSiswa,
                   ),
                   const MenuCard(
                     title: 'Penilaian',
                     icon: Icons.camera_alt_outlined,
                     color: Color(0xFF16A879),
                   ),
-
                   MenuCard(
                     title: 'Absensi',
                     icon: Icons.calendar_month,
                     color: const Color(0xFF7650D9),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AbsensiScreen(),
-                        ),
-                      );
-                    },
+                    onTap: bukaAbsensi,
                   ),
-
                   const MenuCard(
                     title: 'Buat Rapor',
                     icon: Icons.description_outlined,
@@ -203,19 +259,9 @@ class DashboardScreen extends StatelessWidget {
         currentIndex: 0,
         onTap: (index) {
           if (index == 1) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const DataSiswaScreen(),
-              ),
-            );
+            bukaDataSiswa();
           } else if (index == 2) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const AbsensiScreen(),
-              ),
-            );
+            bukaAbsensi();
           }
         },
       ),
@@ -254,7 +300,10 @@ class StatCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 10)),
+                Text(
+                  title,
+                  style: const TextStyle(fontSize: 10),
+                ),
                 Text(
                   value,
                   style: const TextStyle(

@@ -1,69 +1,85 @@
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FormSiswaScreen extends StatefulWidget {
   final Map<String, String>? initialData;
-  
-  const FormSiswaScreen({super.key,this.initialData,});
+
+  const FormSiswaScreen({
+    super.key,
+    this.initialData,
+  });
 
   @override
   State<FormSiswaScreen> createState() => _FormSiswaScreenState();
 }
 
 class _FormSiswaScreenState extends State<FormSiswaScreen> {
-  // Kunci untuk validasi form
   final _formKey = GlobalKey<FormState>();
 
-  // Controller input
   final namaController = TextEditingController();
   final nikController = TextEditingController();
   final nisController = TextEditingController();
   final nisnController = TextEditingController();
 
-  // Data pilihan
   String? selectedGroup = 'Kelompok A';
   String? selectedYear = '2026';
 
   DateTime? selectedDate;
 
-  // Warna aplikasi
+  bool isSaving = false;
+
   final Color primaryBlue = const Color(0xFF1765D9);
-    @override
-    void initState() {
-      super.initState();
 
-      final data = widget.initialData;
+  @override
+  void initState() {
+    super.initState();
 
-      if (data != null) {
-        namaController.text = data['nama'] ?? '';
-        nikController.text = data['nik'] ?? '';
-        nisController.text = data['nis'] ?? '';
-        nisnController.text = data['nisn'] ?? '';
+    final data = widget.initialData;
 
-        selectedGroup = data['kelompok'] ?? 'Kelompok A';
-        selectedYear = data['tahun_masuk'] ?? data['tahun'] ?? '2026';
+    if (data != null) {
+      namaController.text = data['nama'] ?? '';
+      nikController.text = data['nik'] ?? '';
+      nisController.text = data['nis'] ?? '';
+      nisnController.text = data['nisn'] ?? '';
 
-        final tanggal = data['tanggal_lahir'] ?? data['tanggalLahir'];
+      selectedGroup = data['kelompok'] ?? 'Kelompok A';
+      selectedYear = data['tahun_masuk'] ?? data['tahun'] ?? '2026';
 
-        if (tanggal != null && tanggal.isNotEmpty) {
-          final bagian = tanggal.split('/');
+      final tanggal = data['tanggal_lahir'] ?? data['tanggalLahir'];
 
-          if (bagian.length == 3) {
-            selectedDate = DateTime(
-              int.parse(bagian[2]),
-              int.parse(bagian[1]),
-              int.parse(bagian[0]),
-            );
+      if (tanggal != null && tanggal.isNotEmpty) {
+        try {
+          if (tanggal.contains('-')) {
+            selectedDate = DateTime.parse(tanggal);
+          } else if (tanggal.contains('/')) {
+            final bagian = tanggal.split('/');
+
+            if (bagian.length == 3) {
+              selectedDate = DateTime(
+                int.parse(bagian[2]),
+                int.parse(bagian[1]),
+                int.parse(bagian[0]),
+              );
+            }
           }
+        } catch (_) {
+          selectedDate = null;
         }
       }
     }
+  }
+
   // Memilih tanggal lahir
   Future<void> pilihTanggal() async {
+    final DateTime sekarang = DateTime.now();
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(2022),
+      initialDate: selectedDate ?? DateTime(2022),
       firstDate: DateTime(2015),
-      lastDate: DateTime.now(),
+      lastDate: sekarang,
     );
 
     if (picked != null) {
@@ -73,8 +89,8 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
     }
   }
 
-  // Menyimpan data siswa
-  void simpanData() {
+  // Menyimpan atau memperbarui data siswa di Supabase
+  Future<void> simpanData() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -88,18 +104,91 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
       return;
     }
 
-    final dataSiswa = {
-      'nama': namaController.text.trim(),
-      'nik': nikController.text.trim(),
-      'nis': nisController.text.trim(),
-      'nisn': nisnController.text.trim(),
-      'kelompok': selectedGroup!,
-      'tahun_masuk': selectedYear!,
-      'tanggal_lahir':
-          '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
-    };
+    if (selectedGroup == null || selectedYear == null) {
+      return;
+    }
 
-    Navigator.pop(context, dataSiswa);
+    setState(() {
+      isSaving = true;
+    });
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Mengambil ID kelompok berdasarkan nama kelompok.
+      final kelompok = await supabase
+          .from('kelompok')
+          .select('id')
+          .eq('nama_kelompok', selectedGroup!)
+          .single();
+
+      final dataSiswa = {
+        'nama_lengkap': namaController.text.trim(),
+        'nik': nikController.text.trim(),
+        'nis': nisController.text.trim(),
+        'nisn': nisnController.text.trim(),
+        'kelompok_id': kelompok['id'],
+        'tahun_masuk': int.parse(selectedYear!),
+        'tanggal_lahir':
+            '${selectedDate!.year.toString().padLeft(4, '0')}-'
+            '${selectedDate!.month.toString().padLeft(2, '0')}-'
+            '${selectedDate!.day.toString().padLeft(2, '0')}',
+      };
+
+      Map<String, dynamic> hasil;
+
+      if (widget.initialData != null) {
+        // UPDATE DATA SISWA
+        final id = widget.initialData!['id'];
+
+        if (id == null || id.isEmpty) {
+          throw Exception('ID siswa tidak ditemukan.');
+        }
+
+        hasil = await supabase
+            .from('siswa')
+            .update(dataSiswa)
+            .eq('id', id)
+            .select()
+            .single();
+      } else {
+        // TAMBAH DATA SISWA
+        hasil = await supabase
+            .from('siswa')
+            .insert(dataSiswa)
+            .select()
+            .single();
+      }
+
+      if (!mounted) return;
+
+      // Mengembalikan data agar halaman siswa dapat memuat ulang.
+      Navigator.pop(context, {
+        'id': hasil['id'].toString(),
+        'nama': hasil['nama_lengkap'].toString(),
+        'nik': hasil['nik'].toString(),
+        'nis': hasil['nis'].toString(),
+        'nisn': hasil['nisn'].toString(),
+        'kelompok': selectedGroup!,
+        'tahun_masuk': hasil['tahun_masuk'].toString(),
+        'tanggal_lahir': hasil['tanggal_lahir'].toString(),
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Gagal menyimpan data: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSaving = false;
+        });
+      }
+    }
   }
 
   @override
@@ -115,7 +204,6 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FC),
-
       appBar: AppBar(
         backgroundColor: const Color(0xFFF4F7FC),
         elevation: 0,
@@ -125,15 +213,14 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
         ),
         title: Text(
           widget.initialData == null
-          ?'Tambah Data Siswa'
-          :'Edit Data Siswa',
+              ? 'Tambah Data Siswa'
+              : 'Edit Data Siswa',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
         ),
       ),
-
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -142,35 +229,6 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // FOTO PROFIL
-                Center(
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 42,
-                        backgroundColor: const Color(0xFFDCEAFF),
-                        child: Icon(
-                          Icons.person_outline,
-                          size: 45,
-                          color: primaryBlue,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Fitur unggah foto akan dibuat berikutnya',
-                              ),
-                            ),
-                          );
-                        },
-                        child: const Text('Ubah Foto'),
-                      ),
-                    ],
-                  ),
-                ),
-
                 const SizedBox(height: 15),
 
                 // NAMA LENGKAP
@@ -217,9 +275,7 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
                         ],
                       ),
                     ),
-
                     const SizedBox(width: 12),
-
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,9 +306,8 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
                         children: [
                           const Text('Kelompok *'),
                           const SizedBox(height: 7),
-
                           DropdownButtonFormField<String>(
-                            value: selectedGroup,
+                            initialValue: selectedGroup,
                             decoration: inputDecoration(),
                             items: const [
                               DropdownMenuItem(
@@ -273,24 +328,21 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
                         ],
                       ),
                     ),
-
                     const SizedBox(width: 12),
-
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text('Tahun Masuk *'),
                           const SizedBox(height: 7),
-
                           DropdownButtonFormField<String>(
-                            value: selectedYear,
+                            initialValue: selectedYear,
                             decoration: inputDecoration(),
                             items: List.generate(
                               12,
                               (index) {
-                                final year = (DateTime.now().year - index)
-                                    .toString();
+                                final year =
+                                    (DateTime.now().year - index).toString();
 
                                 return DropdownMenuItem(
                                   value: year,
@@ -348,7 +400,7 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: simpanData,
+                    onPressed: isSaving ? null : simpanData,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryBlue,
                       foregroundColor: Colors.white,
@@ -356,12 +408,21 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Simpan',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: isSaving
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Simpan',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
                 ),
 
@@ -388,6 +449,9 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
       keyboardType: numberOnly
           ? TextInputType.number
           : TextInputType.text,
+      inputFormatters: numberOnly
+          ? [FilteringTextInputFormatter.digitsOnly]
+          : null,
       maxLength: maxLength,
       style: const TextStyle(fontSize: 13),
       decoration: inputDecoration(
@@ -399,7 +463,7 @@ class _FormSiswaScreenState extends State<FormSiswaScreen> {
           return 'Wajib diisi';
         }
 
-        if (minLength != null && value.length != minLength) {
+        if (minLength != null && value.trim().length != minLength) {
           return 'Harus $minLength digit';
         }
 
